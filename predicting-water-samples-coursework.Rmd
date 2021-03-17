@@ -1,0 +1,483 @@
+---
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+
+# Loading Necessary Packages 
+
+library(lattice)
+library(ggplot2)
+library(caret)
+library(RColorBrewer)
+library(Matrix)
+library(grid)
+library(arules)
+library(arulesViz)
+```
+
+```{r, include=FALSE}
+
+# Setting Working Directory 
+
+library(here)
+setwd(here::here())
+```
+
+# Task 1
+
+## (a)
+
+### Loading Datasets 
+
+```{r}
+water1 <- read.csv("sampleWater1.csv",
+                   header = TRUE,
+                   sep = ",",
+                   stringsAsFactors = TRUE)
+
+water2 <- read.csv("sampleWater2.csv",
+                   header = TRUE,
+                   sep = ",",
+                   stringsAsFactors = TRUE)
+
+testWater <- read.csv("testWater.csv",
+                      header = TRUE,
+                      sep = ",",
+                      stringsAsFactors = TRUE)
+```
+
+### Exploring water1
+
+```{r}
+dim(water1)
+str(water1)
+colSums(is.na(water1))
+head(water1)
+tail(water1)
+summary(water1)
+
+ggplot(data = water1) +
+  geom_bar(mapping = aes(x = siteIDScheme))
+ggplot(data = water1) +
+  geom_bar(mapping = aes(x = WBCategory))
+ggplot(data = water1) +
+  geom_bar(mapping = aes(x = determinandC))
+ggplot(data = water1) +
+  geom_bar(mapping = aes(x = method))
+```
+
+### Exploring water2
+
+```{r}
+dim(water2)
+str(water2)
+colSums(is.na(water2))
+head(water2)
+tail(water2)
+summary(water2)
+
+ggplot(data = water2) +
+  geom_bar(mapping = aes(x = siteIDScheme))
+ggplot(data = water2) +
+  geom_bar(mapping = aes(x = WBCategory))
+ggplot(data = water2) +
+  geom_bar(mapping = aes(x = determinandC))
+ggplot(data = water2) +
+  geom_bar(mapping = aes(x = method))
+```
+
+### Exploring testWater
+
+```{r}
+dim(testWater)
+str(testWater)
+colSums(is.na(testWater))
+head(testWater)
+tail(testWater)
+summary(testWater)
+
+ggplot(data = testWater) +
+  geom_bar(mapping = aes(x = siteIDScheme))
+ggplot(data = testWater) +
+  geom_bar(mapping = aes(x = WBCategory))
+ggplot(data = testWater) +
+  geom_bar(mapping = aes(x = determinandC))
+ggplot(data = testWater) +
+  geom_bar(mapping = aes(x = method))
+```
+
+### Analysis 
+
+2 Attributes - analysed & media - are factors with only 1 level - suggests redundancy. 
+
+Bar charts in exploration highlight a large imbalance in the siteIDScheme and WBCategory attributes - similar over each dataset. Large skew towards euSiteMonitoringCode for siteIDScheme and LW for WBCategory. CAS_14798-03 9 determinand very much lower than the other 3. There is only 1 TW WBCategory value in water1 and 1 TW in water2 whilst there is 5 in testWater.
+
+Analysis of numerical attributes reveal large difference in max/min values - likely needs normalisation or centre/scale. 
+
+NA values found in around 10% of instances in sd column - removal or imputation needed. 
+
+Mixed data types - nominal and numerical - suggests binarising may be necessary and careful selection of algorithms. 
+
+## (b)
+
+### Creating Control Variable
+
+```{r}
+ctrl <- trainControl(method = "repeatedcv",
+                     repeats = 3,
+                     verboseIter=FALSE)
+```
+
+### water1 
+
+#### Pre-Processing water1 
+
+```{r}
+noNAwater1 <-na.omit(water1)
+noNAwater1Mod <- subset(noNAwater1, select = -c(analysed,media))
+```
+
+#### Applying J48 to water1 
+
+```{r}
+set.seed(1)
+j48water1 <- train(WBCategory ~ .,
+                 data = noNAwater1Mod,
+                 method = "J48", 
+                 tuneLength = 12,
+                 trControl = ctrl)
+
+summary(j48water1$finalModel)
+confusionMatrix(j48water1)
+```               
+
+#### Applying C5.0Tree to water1 
+
+```{r}
+set.seed(1)
+c5water1 <- train(WBCategory ~ .,
+                data = noNAwater1Mod,
+                method = "C5.0Tree", 
+                tuneLength = 12,
+                trControl = ctrl)
+
+
+summary(c5water1$finalModel)
+confusionMatrix(c5water1)
+```  
+
+#### Applying k-NN to water1 
+
+```{r}
+set.seed(1)
+kNNwater1 <- train(WBCategory ~ ., 
+                  data = noNAwater1Mod,
+                  method = "knn",
+                  tuneGrid=expand.grid(.k=1:20),
+                  trControl = ctrl)
+
+print(kNNwater1)
+plot(kNNwater1, type ="p")
+print(kNNwater1$results)	
+confusionMatrix(kNNwater1)
+```  
+
+### water
+
+#### Creating water
+
+```{r}
+water <- rbind(water1, water2)
+```
+
+#### Pre-Processing water
+
+```{r}
+noNAwater <-na.omit(water)
+noNAwaterMod <- subset(noNAwater, select = -c(analysed,media))
+```
+
+#### Applying J48 to water
+
+```{r}
+set.seed(1)
+j48water <- train(WBCategory ~ .,
+                 data = noNAwaterMod,
+                 method = "J48", 
+                 tuneLength = 12,
+                 trControl = ctrl)
+
+
+summary(j48water$finalModel)
+confusionMatrix(j48water)
+```
+
+#### Applying C5.0Tree to water 
+
+```{r}
+set.seed(1)
+c5water <- train(WBCategory ~ .,
+                data = noNAwaterMod,
+                method = "C5.0Tree", 
+                tuneLength = 12,
+                trControl = ctrl)
+
+
+summary(c5water$finalModel)
+confusionMatrix(c5water)
+```
+
+#### Applying k-NN to water
+
+```{r}
+set.seed(1)
+kNNwater <- train(WBCategory ~ ., 
+                data = noNAwaterMod,
+                method = "knn",
+                tuneGrid=expand.grid(.k=1:20),
+                trControl = ctrl)
+
+print(kNNwater)
+plot(kNNwater, type ="p")
+print(kNNwater$results)	
+confusionMatrix(kNNwater)
+```
+
+### Comparing Confusion Matrices
+
+```{r}
+confusionMatrix(j48water1)
+confusionMatrix(c5water1)
+confusionMatrix(kNNwater1)
+
+confusionMatrix(j48water)
+confusionMatrix(c5water)
+confusionMatrix(kNNwater)
+```
+
+### Analysis
+
+J48/C5.0T/kNN within caret work well with multiple data types, unlike CART. NA values not accepted. kNN better with noisy data compared with 1NN. kNN uses dummy variables - less accurate (also computationally expensive).
+
+NAs omitted from each dataset rather than imputation since only around 10% of instances affected, Redundant attributes removed. 
+
+10-fold rCV used - gives good estimates, but computationally expensive. Standard tuneGrid/tuneLength values used to refine models.
+
+Performance metrics are accuracy and kappa. J48/C5.0T have higher average accuracy than kNN. No statistical significance between J48/C5.0Tree. High accuracy on training set - check overfitting. Statistical significance between kNN and rest - less accurate due to dummy variables.
+
+k=4 for water1 and k=7 for water. 
+
+water1 has 2832 instances and water has 5059 instances. 
+
+Next step to ensure reliability is to test model on test data. 
+
+Errors in the confusion matrices disproportionately affect GW and RW - good performance but biased towards classifying LW correctly. 
+
+## (c)
+
+### Measuring Statistical Significance 
+
+### water1
+
+#### Collecting Resamples & Comparing 
+
+```{r}
+resultsWater1 <- resamples(list(j48=j48water1, c5=c5water1, kNN=kNNwater1))
+
+scalesWater1 <- list(x=list(relation="free"), y=list(relation= "free"))
+dotplot(resultsWater1, scales=scalesWater1, conf.level = 0.99)
+dotplot(resultsWater1, scales=scalesWater1, conf.level = 0.97)
+dotplot(resultsWater1, scales=scalesWater1, conf.level = 0.95)
+
+splom(resultsWater1)
+```
+
+### water
+
+#### Collecting Resamples & Comparing
+
+```{r}
+resultsWater <- resamples(list(j48=j48water, c5=c5water, kNN=kNNwater))
+
+scalesWater <- list(x=list(relation="free"), y=list(relation= "free"))
+dotplot(resultsWater, scales=scalesWater, conf.level = 0.99)
+dotplot(resultsWater, scales=scalesWater, conf.level = 0.97)
+dotplot(resultsWater, scales=scalesWater, conf.level = 0.95)
+
+splom(resultsWater)
+```
+
+### Analysis
+
+From dotplots - no confidence level at which difference in performance between kNN and j48/C5.0T becomes statistically insignificant. Discrepancy in performance between J48/C5.0 and kNN likely down to kNN algorithm in caret having to create dummy variables "under-the-hood" to deal with different data types - not as accurate. 
+
+## (d)
+
+### Processing testWater
+
+```{r}
+noNAtestWater <-na.omit(testWater)
+noNAtestwaterMod <- subset(noNAtestWater, select = -c(analysed,media))
+```
+
+### Testing Models on testWater & Comparing
+
+```{r}
+Testj48water <- predict(j48water, newdata=noNAtestwaterMod, type="raw")
+confusionMatrix(Testj48water, noNAtestwaterMod$WBCategory)
+
+Testc5water <- predict(c5water, newdata=noNAtestwaterMod, type="raw")
+confusionMatrix(Testc5water, noNAtestwaterMod$WBCategory)
+
+TestkNNwater <- predict(kNNwater, newdata=noNAtestwaterMod, type="raw")
+confusionMatrix(TestkNNwater, noNAtestwaterMod$WBCategory)
+```
+
+### Analysis 
+
+J48/C5.0T have similar Accuracy (97.49% vs 97.31%) and Kappa (0.797 vs 0.7993) values - overlapping CI indicates difference not statistically significant. 
+
+kNN performed slightly worse (Accuracy of 96.28% and Kappa of 0.7003). CI for kNN overlaps - suggesting difference is also not statistically significant on testing. kNN would be preferred when data is noisy. 
+
+Good performance on testing data. Increased accuracy over training data - no overfitting. Matrix errors disproportionately affect GW and RW - models have great performance but biased towards LW. 
+
+# Task 2
+
+## (a)
+
+### Binarising water Dataset via One Hot Encoding
+
+```{r}
+noNAwaterModClust <- subset(noNAwater, select = -c(analysed,media))
+
+set.seed(1)
+
+binaryVars <- dummyVars(~ ., data = noNAwaterModClust)
+binWater<- data.frame(predict(binaryVars, newdata = noNAwaterModClust))
+
+summary(binWater)
+head(binWater)
+```
+
+### Normalising Variables to Within 0 and 1 
+
+```{r}
+preProBW <- preProcess(binWater, method=c("range"))
+ 
+normBW <- predict(preProBW, binWater)
+ 
+summary(normBW)
+```
+
+Binarising conducted to turn nominal data into numerical. Normalising needed over center/scale to ensure numerical/binarised nominal data work together - gives data common scale between 0 and 1.
+
+### Finding K via Elbow Method
+
+```{r}
+wss <- (nrow(normBW)-1)*sum(apply(normBW,2,var))
+for (i in 2:15) 
+wss[i] <- sum(kmeans(normBW, centers=i, nstart=100, 
+iter.max=1000)$withinss)
+
+plot(1:15, wss, type="b", xlab="k= Number of Clusters", ylab="Within groups sum of squares")
+```
+
+K at elbow of graph (ideal number of clusters) taken as 4. 
+
+### Applying K-Means to Water 
+
+```{r}
+km <- kmeans(normBW, 4, nstart=25, iter.max=1000)
+
+str(km)
+```
+
+### Sample of Clusters
+
+```{r}
+sort(table(km$clust))
+clust <- names(sort(table(km$clust)))
+
+# C1
+head(row.names(binWater[km$clust==clust[1],]))
+
+# C2
+head(row.names(binWater[km$clust==clust[2],]))
+
+# C3
+head(row.names(binWater[km$clust==clust[3],]))
+
+# C4
+head(row.names(binWater[km$clust==clust[4],]))
+```
+
+### Analysis
+
+K-Means easy to implement and explain. Faster compared to Hierarchial. Downsides are pre-processing needed due to different data types and need to find K value. Ideal K is 4. Each cluster represents grouping of similar instances. 
+
+```{r}
+summary(water$determinandC)
+sort(table(km$clust))
+clust <- names(sort(table(km$clust)))
+```
+
+Clusters correlate with the DeterminandC attribute (C1 = CAS-14798, C2 = CAS-7723, C3 = EEA-3131, C4 = EEA-132). Clustering worked well since similar instances classified almost exactly into groups based on Determinand - can use cluster data to help group future instances based on its Determinand & process them as necessary. 
+
+## (b)
+
+### Processing Water1 - Removing Numerical Data
+
+```{r}
+noNAwater1 <-na.omit(water1)
+noNAwater1ModApr <- subset(noNAwater1, select = -c(analysed,media, NSamples, minValue, meanValue, maxValue, sd))
+
+summary(noNAwater1ModApr)
+```
+
+### Applying Apriori to Water1 with Low Support & Confidence Levels
+
+```{r}
+rules <- apriori(noNAwater1ModApr, parameter=list(support=0.01, confidence=0.50))
+```
+
+### Selecting Top 10 Rules 
+
+```{r}
+rules.sorted <- sort(rules, by="lift")
+inspect(head(sort(rules, by ="lift"),10))
+
+rules.sorted1 <- sort(rules, by="confidence")
+inspect(head(sort(rules, by ="confidence"),10))
+```
+
+### Identify Redundant Rules
+
+```{r}
+subset.matrix <- is.subset(rules.sorted, rules.sorted, sparse = FALSE)
+subset.matrix[lower.tri(subset.matrix, diag=T)] <- NA
+redundant <- colSums(subset.matrix, na.rm=T) >= 1
+
+rules.pruned <- rules.sorted[!redundant]
+
+inspect(head(sort(rules.pruned, by ="lift"),10))
+
+quality(rules.pruned) 
+```
+
+### Analysis 
+
+Apriori association algorithm chosen to find associations/trends between categorical variables in water1. Downsides are it can be hard to discover actionable rules on nominal data, as well as not being useful for sparsely populated data. Apriori works well for the modified water1 data file in this section as only categorical attributes have been included in the analysis, making the creation of logical rules easy to understand and to compliment already completed analysis. 
+
+To add to the clustering analysis conducted in part 2a, running the Apriori algorithm and generating pruned rules highlights associations in the data between determinands and their respective analytical methods, as well as between water categories and analytical methods used to obtain determinands pertaining to them. 
+
+### Plotting Pruned Rules by Support/Lift
+
+```{r}
+plot(rules.pruned, measure=c("support", "lift"), shading="confidence")
+```
+
+From the plot above, it can be seen that rules that maximise the support/lift have a support of around 25% and a lift of around 3.75, 2 values in particular have a high degree of confidence also.
